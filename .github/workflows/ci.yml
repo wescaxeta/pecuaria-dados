@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync --frozen --all-extras
       - name: Ruff (lint)
         run: uv run ruff check --output-format=github .
@@ -46,7 +46,7 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://pecuaria:pecuaria@localhost:5432/pecuaria_test
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync --frozen --all-extras
       - name: Pytest com cobertura
         run: uv run pytest --cov --cov-report=term-missing:skip-covered --cov-fail-under=85 | tee pytest.log
