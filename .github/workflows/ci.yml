@@ -15,7 +15,7 @@ jobs:
     name: Lint, formatação e tipos
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --frozen --all-extras
       - name: Ruff (lint)
@@ -45,7 +45,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql+psycopg://pecuaria:pecuaria@localhost:5432/pecuaria_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --frozen --all-extras
       - name: Pytest com cobertura
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [qualidade, testes]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build das imagens
         run: docker compose build
