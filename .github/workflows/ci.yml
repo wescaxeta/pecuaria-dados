@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade:
+    name: Lint, formatação e tipos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --all-extras
+      - name: Ruff (lint)
+        run: uv run ruff check --output-format=github .
+      - name: Ruff (formatação)
+        run: uv run ruff format --check .
+      - name: Mypy (strict)
+        run: uv run mypy
+
+  testes:
+    name: Testes (com PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: pecuaria_test
+          POSTGRES_USER: pecuaria
+          POSTGRES_PASSWORD: pecuaria
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pecuaria -d pecuaria_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://pecuaria:pecuaria@localhost:5432/pecuaria_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --all-extras
+      - name: Pytest com cobertura
+        run: uv run pytest --cov --cov-report=term-missing:skip-covered --cov-fail-under=85 | tee pytest.log
+      - name: Resumo de cobertura
+        run: |
+          echo '### Cobertura de testes' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          grep -E 'TOTAL|passed|failed' pytest.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  e2e:
+    name: Ponta a ponta (dados reais do IBGE)
+    runs-on: ubuntu-latest
+    needs: [qualidade, testes]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build das imagens
+        run: docker compose build
+
+      - name: Banco + ETL com dados reais do IBGE
+        run: |
+          docker compose up -d --wait db
+          docker compose run --rm etl
+
+      - name: Sobe API e painel
+        run: |
+          docker compose up -d --no-deps api painel
+          for i in $(seq 1 60); do curl -sf http://localhost:8000/health && break; sleep 1; done
+          for i in $(seq 1 60); do curl -sf http://localhost:8501/_stcore/health && break; sleep 1; done
+
+      - name: Smoke test
+        run: sh tests/smoke.sh
+
+      - name: Logs em caso de falha
+        if: failure()
+        run: docker compose logs

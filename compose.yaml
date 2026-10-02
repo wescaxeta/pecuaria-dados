@@ -1,0 +1,43 @@
+# API em http://localhost:8000/docs · Painel em http://localhost:8501
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pecuaria
+      POSTGRES_USER: pecuaria
+      POSTGRES_PASSWORD: pecuaria
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pecuaria -d pecuaria"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # Roda uma vez: aplica as migrations e carrega os dados do IBGE (GO, MT e MS, últimos 5 anos)
+  etl:
+    build: .
+    command: sh -c "alembic upgrade head && pecuaria-etl --uf GO --uf MT --uf MS --anos 5"
+    environment:
+      DATABASE_URL: postgresql+psycopg://pecuaria:pecuaria@db:5432/pecuaria
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://pecuaria:pecuaria@db:5432/pecuaria
+    depends_on:
+      etl:
+        condition: service_completed_successfully
+
+  painel:
+    build: .
+    command: streamlit run src/pecuaria_dados/painel.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      - api

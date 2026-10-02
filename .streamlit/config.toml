@@ -1,0 +1,10 @@
+[client]
+# Esconde o botão "Deploy" e o menu de desenvolvedor
+toolbarMode = "viewer"
+
+[theme]
+base = "light"
+primaryColor = "#2E7D32"
+
+[browser]
+gatherUsageStats = false
